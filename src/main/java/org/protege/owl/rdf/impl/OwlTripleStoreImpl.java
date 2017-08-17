@@ -5,7 +5,9 @@ import info.aduna.iteration.CloseableIteration;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Level;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Statement;
@@ -81,14 +83,29 @@ public class OwlTripleStoreImpl implements OwlTripleStore {
 		sourceOntologyProperty  = rdfFactory.createURI(SOURCE_ONTOLOGY);
 		ontologyIdProperty      = rdfFactory.createURI(ONTOLOGY_ID);
 		ontologyVersionProperty = rdfFactory.createURI(ONTOLOGY_VERSION);
-		anonymousHandler = new AnonymousResourceHandler(factory);
+                anonymousHandler = new AnonymousResourceHandler(factory);
 	}
 
 	@Override
 	public Repository getRepository() {
 		return repository;
 	}
-
+        
+          @Override
+        public void addAxiom(OWLOntologyID ontologyId, Set<OWLAxiom> axiom) throws RepositoryException {
+        	
+                axiom.forEach(anonymousHandler::insertSurrogates);
+                org.openrdf.model.URI ontologyRepresentative = getOntologyRepresentative(ontologyId);
+                for (OWLAxiom a : axiom) {
+                    if(getAxiomId(ontologyId, a) != null){
+                        System.out.print("removed" +a.toString());
+                   }
+                }                 
+                RDFTranslator.translate(repository, axiom, hashCodeProperty, sourceOntologyProperty, ontologyRepresentative);
+             
+        }
+                  
+	
 	@Override
 	public void addAxiom(OWLOntologyID ontologyId, OWLAxiom axiom) throws RepositoryException {
 	    axiom = anonymousHandler.insertSurrogates(axiom);
@@ -109,7 +126,7 @@ public class OwlTripleStoreImpl implements OwlTripleStore {
 	}
 	
 	@Override
-    public boolean hasAxiom(OWLOntologyID ontologyId, OWLAxiom axiom) throws RepositoryException {
+        public boolean hasAxiom(OWLOntologyID ontologyId, OWLAxiom axiom) throws RepositoryException {
 	    axiom = anonymousHandler.insertSurrogates(axiom);
 		return getAxiomId(ontologyId, axiom) != null;
 	}
@@ -458,6 +475,5 @@ public class OwlTripleStoreImpl implements OwlTripleStore {
 	        connection.close();
 	    }
 	    return representative;
-	}
-
+	} 
 }

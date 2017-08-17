@@ -44,11 +44,10 @@ public class Utilities {
 	}
 
 	public static void loadOwlTripleStore(OwlTripleStore ots, OWLOntology ontology, boolean sync) throws RepositoryException {
-		for (OWLAxiom axiom : ontology.getAxioms()) {
-			ots.addAxiom(ontology.getOntologyID(), axiom);
-		}
-		if (sync) {
-			synchronize(ots, ontology.getOWLOntologyManager());
+                   
+            ots.addAxiom(ontology.getOntologyID(),ontology.getAxioms());
+            if (sync) {                
+                synchronize(ots, ontology.getOWLOntologyManager());
 		}
 	}
 	

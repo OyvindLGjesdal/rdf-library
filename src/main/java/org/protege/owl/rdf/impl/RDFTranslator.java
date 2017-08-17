@@ -18,10 +18,55 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-
+import org.openrdf.model.URI;
 
 public class RDFTranslator extends AbstractTranslator<Value, Resource, org.openrdf.model.URI, org.openrdf.model.Literal> {
     public static final Logger LOGGER = LoggerFactory.getLogger(RDFTranslator.class);
+
+    static void translate(Repository repository, Set<OWLAxiom> axiom, URI hashCodeProperty, URI sourceOntologyProperty, URI ontologyRepresentative) throws RepositoryException {
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Starting axiom parse");
+	    }
+            boolean success = false;
+            RDFTranslator translator = null;	
+            try {                 
+                OWLOntology ontology = createOntology(manager, axiom);      
+                for (OWLAxiom a : axiom) {
+                    
+                    translator = new RDFTranslator(repository, manager, ontology);   
+                    ValueFactory rdfFactory = repository.getValueFactory();
+                    RepositoryConnection connection = translator.getConnection();
+                    a.accept(translator);
+                    for (OWLEntity entity : a.getSignature()) {  // why aren't these getting included?
+                        connection.add(rdfFactory.createURI(entity.getIRI().toString()), 
+                                rdfFactory.createURI(OWLRDFVocabulary.RDF_TYPE.getIRI().toString()),
+                                rdfFactory.createURI(entity.getEntityType().getVocabulary().getIRI().toString()),
+                                translator.axiomResource);
+			}
+                    org.openrdf.model.Literal hashCodeValue = rdfFactory.createLiteral(a.hashCode());
+                    connection.add(translator.axiomResource, hashCodeProperty, hashCodeValue);
+                    connection.add(translator.axiomResource, sourceOntologyProperty, ontologyRepresentative);			
+                        }
+                success = true;	
+		}
+		catch (RepositoryRuntimeException rre) {
+			throw rre.getCause();
+		} catch (OWLOntologyCreationException e) {
+			throw new RepositoryException(e);
+		}
+		finally {
+			if (translator != null) {
+				translator.close(success);
+                                System.out.print("translator success");
+			}
+                        else {System.out.print("translator failure");}
+		}
+		if (LOGGER.isDebugEnabled()) {
+		    LOGGER.debug("Finished axiom parse");
+		}
+       
+    // throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
 	private org.openrdf.model.URI axiomResource;
 
 	/**
@@ -50,17 +95,17 @@ public class RDFTranslator extends AbstractTranslator<Value, Resource, org.openr
 
 		RDFTranslator translator = null;
 		
-		try {
-			OWLOntology ontology = createOntology(manager, axiom);
+		try {                      
+            OWLOntology ontology = createOntology(manager, axiom);
 		    translator = new RDFTranslator(repository, manager, ontology);
 			ValueFactory rdfFactory = repository.getValueFactory();
 			RepositoryConnection connection = translator.getConnection();
 			axiom.accept(translator);
 			for (OWLEntity entity : axiom.getSignature()) {  // why aren't these getting included?
 				connection.add(rdfFactory.createURI(entity.getIRI().toString()), 
-						       rdfFactory.createURI(OWLRDFVocabulary.RDF_TYPE.getIRI().toString()), 
-						       rdfFactory.createURI(entity.getEntityType().getVocabulary().getIRI().toString()), 
-						       translator.axiomResource);
+			    rdfFactory.createURI(OWLRDFVocabulary.RDF_TYPE.getIRI().toString()), 
+				rdfFactory.createURI(entity.getEntityType().getVocabulary().getIRI().toString()), 
+				translator.axiomResource);
 			}
 
 			org.openrdf.model.Literal hashCodeValue = rdfFactory.createLiteral(axiom.hashCode());
@@ -86,6 +131,12 @@ public class RDFTranslator extends AbstractTranslator<Value, Resource, org.openr
 	private static OWLOntology createOntology(OWLOntologyManager manager, OWLAxiom axiom) throws OWLOntologyCreationException {
 		Set<OWLAxiom> axiomSet = new HashSet<>();
 		axiomSet.add(axiom);
+		return manager.createOntology(axiomSet);
+	}
+        
+        private static OWLOntology createOntology(OWLOntologyManager manager, Set<OWLAxiom> axiom) throws OWLOntologyCreationException {
+		Set<OWLAxiom> axiomSet = new HashSet<>();
+		axiomSet.addAll(axiom);
 		return manager.createOntology(axiomSet);
 	}
 
